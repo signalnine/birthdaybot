@@ -23,7 +23,7 @@ for index, item in df.iterrows():
         resp = requests.post('https://textbelt.com/text', {
             'phone': '4159525775',
             'message': item['Name'] + '\'s birthday',
-            'key': os.getenv("TBKEY",
+            'key': os.getenv("TBKEY"),
         })
         print(resp.json())
 if (tweet != ""):
