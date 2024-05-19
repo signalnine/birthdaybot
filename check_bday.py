@@ -21,7 +21,7 @@ for index, item in df.iterrows():
         insta = item['Instagram']
     elif(bday == today):
         resp = requests.post('https://textbelt.com/text', {
-            'phone': '4159525775',
+            'phone': 'your_phone_no',
             'message': item['Name'] + '\'s birthday',
             'key': os.getenv("TBKEY"),
         })
