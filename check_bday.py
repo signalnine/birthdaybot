@@ -62,6 +62,9 @@ def notify(name: str, phone: str, key: str) -> bool:
         return False
 
     print(body)
+    if not isinstance(body, dict):
+        print(f"textbelt returned unexpected JSON shape for {name}: {type(body).__name__}")
+        return False
     if not body.get("success"):
         print(f"textbelt rejected message for {name}: {body.get('error')}")
         return False

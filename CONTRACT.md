@@ -16,3 +16,9 @@
 - [x] `notify` returns False when textbelt response body has `success: false` -> test: mock post returns `{"success": false, "error": "Out of quota"}`, assert returns False
 - [x] `notify` returns False on non-2xx HTTP status -> test: mock post returns 500, assert returns False
 - [x] `notify` still returns True on `{"success": true, ...}` 200 response -> test: mock post returns `{"success": true, "textId": "abc", "quotaRemaining": 10}`, assert returns True
+
+## Bug fix: non-dict JSON bodies
+
+- [x] `notify` returns False when body is JSON null -> test: mock post returns `None`, assert returns False (no AttributeError)
+- [x] `notify` returns False when body is a JSON list -> test: mock post returns `["unexpected"]`, assert returns False
+- [x] `notify` returns False when body is a JSON scalar -> test: mock post returns `"surprise string"`, assert returns False

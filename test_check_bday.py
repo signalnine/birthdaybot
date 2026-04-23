@@ -84,3 +84,30 @@ def test_notify_returns_false_on_http_error_status():
         resp.json.return_value = {}
         mock_post.return_value = resp
         assert notify("Tony", "555-1234", "key") is False
+
+
+def test_notify_returns_false_when_body_is_null():
+    with patch("check_bday.requests.post") as mock_post:
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = None
+        mock_post.return_value = resp
+        assert notify("Tony", "555-1234", "key") is False
+
+
+def test_notify_returns_false_when_body_is_list():
+    with patch("check_bday.requests.post") as mock_post:
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = ["unexpected"]
+        mock_post.return_value = resp
+        assert notify("Tony", "555-1234", "key") is False
+
+
+def test_notify_returns_false_when_body_is_scalar():
+    with patch("check_bday.requests.post") as mock_post:
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = "surprise string"
+        mock_post.return_value = resp
+        assert notify("Tony", "555-1234", "key") is False
