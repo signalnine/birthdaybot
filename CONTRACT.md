@@ -10,3 +10,9 @@
 - [x] Feb 28 birthday matches Feb 28 regardless of year -> test: `matches_today("02-28", date(2025, 2, 28))` returns True
 - [x] Feb 28 birthday does not leak into Feb 29 -> test: `matches_today("02-28", date(2024, 2, 29))` returns False
 - [x] Script still runs end-to-end -> smoke test: `python3 check_bday.py` with today=2026-04-22 exits cleanly
+
+## Bug fix: textbelt API-level failures
+
+- [x] `notify` returns False when textbelt response body has `success: false` -> test: mock post returns `{"success": false, "error": "Out of quota"}`, assert returns False
+- [x] `notify` returns False on non-2xx HTTP status -> test: mock post returns 500, assert returns False
+- [x] `notify` still returns True on `{"success": true, ...}` 200 response -> test: mock post returns `{"success": true, "textId": "abc", "quotaRemaining": 10}`, assert returns True

@@ -32,11 +32,12 @@ REQUEST_TIMEOUT = 10
 
 
 def notify(name: str, phone: str, key: str) -> bool:
-    """Send a birthday text. Returns True on success, False on network failure.
+    """Send a birthday text. Returns True only on confirmed delivery.
 
-    Wrapped in try/except so a single network error doesn't halt the loop
-    and miss other birthdays that day. Timeout prevents the cron job from
-    hanging indefinitely if textbelt is unresponsive.
+    textbelt returns 200 with `{"success": false, "error": "..."}` for
+    application-level failures (out of quota, bad key, invalid phone), so
+    a 2xx status alone is not enough -- the response body must also report
+    success.
     """
     try:
         resp = requests.post(
@@ -44,12 +45,27 @@ def notify(name: str, phone: str, key: str) -> bool:
             {"phone": phone, "message": name + "'s birthday", "key": key},
             timeout=REQUEST_TIMEOUT,
         )
-        print(name + "'s birthday")
-        print(resp.json())
-        return True
     except requests.RequestException as exc:
         print(f"Failed to notify for {name}: {exc}")
         return False
+
+    print(name + "'s birthday")
+
+    if resp.status_code >= 400:
+        print(f"textbelt returned HTTP {resp.status_code} for {name}")
+        return False
+
+    try:
+        body = resp.json()
+    except ValueError:
+        print(f"textbelt returned non-JSON response for {name}")
+        return False
+
+    print(body)
+    if not body.get("success"):
+        print(f"textbelt rejected message for {name}: {body.get('error')}")
+        return False
+    return True
 
 
 def main():
