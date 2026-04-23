@@ -1,44 +1,53 @@
 #!/usr/bin/python3
 
-import pandas as pd
+import calendar
 import datetime
-import tweepy
 import os
+from pathlib import Path
+
+import pandas as pd
 import requests
 from dotenv import load_dotenv
-from instadm import InstaDM
 
-tweet = ""
-insta = ""
-df = pd.read_csv("/home/gabe/birthdaybot/birthdays.csv")
-today = datetime.datetime.now().strftime("%m-%d")
-for index, item in df.iterrows():
-    bday = item['Birthday']
-    if(bday == today and item['Twitter'] != 'na'):
-        print(item['Name'] + "'s birthday")
-        tweet = (item['Twitter'] + " happy birthday!")
-    elif(bday == today and item['Instagram'] != 'na'):
-        insta = item['Instagram']
-    elif(bday == today):
-        resp = requests.post('https://textbelt.com/text', {
-            'phone': 'your_phone_no',
-            'message': item['Name'] + '\'s birthday',
-            'key': os.getenv("TBKEY"),
-        })
-        print(resp.json())
-if (tweet != ""):
-    # Authenticate to Twitter
-    auth = tweepy.OAuthHandler(os.getenv("APIKEY"), os.getenv("APISECRET"))
-    auth.set_access_token(os.getenv("TOKEN"), os.getenv("TOKENSECRET"))
-    api = tweepy.API(auth)
-    # tweet
-    api.update_status(tweet)
-    print(tweet)
 
-if (insta != ""):
-    # instagram auth
-    instamsg = InstaDM(username=os.getenv("INSTAUSER"),
-                       password=os.getenv("INSTAPASS"), headless=True)
-    # dm user
-    instamsg.sendMessage(user=insta, message='happy birthday!')
-    print(insta)
+def matches_today(bday: str, today: datetime.date) -> bool:
+    """Return True if the CSV birthday string matches today's date.
+
+    Feb 29 birthdays roll to Feb 28 in non-leap years so they aren't
+    silently skipped for three years out of four.
+    """
+    if bday == today.strftime("%m-%d"):
+        return True
+    if (
+        bday == "02-29"
+        and today.month == 2
+        and today.day == 28
+        and not calendar.isleap(today.year)
+    ):
+        return True
+    return False
+
+
+def main():
+    load_dotenv(os.path.expanduser("~/.env"))
+
+    csv_path = Path(__file__).resolve().parent / "birthdays.csv"
+    df = pd.read_csv(csv_path)
+    today = datetime.date.today()
+
+    for _, item in df.iterrows():
+        if matches_today(item["Birthday"], today):
+            resp = requests.post(
+                "https://textbelt.com/text",
+                {
+                    "phone": os.getenv("PHONE"),
+                    "message": item["Name"] + "'s birthday",
+                    "key": os.getenv("TXTBELT_KEY"),
+                },
+            )
+            print(item["Name"] + "'s birthday")
+            print(resp.json())
+
+
+if __name__ == "__main__":
+    main()
