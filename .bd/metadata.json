@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "birthdaybot",
+  "project_id": "4703073a-f38f-4323-bfd0-2aaa0436be6d"
+}
