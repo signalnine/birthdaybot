@@ -1,6 +1,9 @@
 from datetime import date
+from unittest.mock import patch, MagicMock
 
-from check_bday import matches_today
+import requests
+
+from check_bday import matches_today, notify
 
 
 def test_exact_match():
@@ -30,3 +33,26 @@ def test_feb_28_matches_feb_28_any_year():
 
 def test_feb_28_does_not_match_feb_29():
     assert not matches_today("02-28", date(2024, 2, 29))
+
+
+def test_notify_passes_timeout_to_requests():
+    with patch("check_bday.requests.post") as mock_post:
+        mock_post.return_value = MagicMock()
+        notify("Tony", "555-1234", "key")
+        assert "timeout" in mock_post.call_args.kwargs
+
+
+def test_notify_returns_false_on_timeout():
+    with patch("check_bday.requests.post", side_effect=requests.Timeout):
+        assert notify("Tony", "555-1234", "key") is False
+
+
+def test_notify_returns_false_on_connection_error():
+    with patch("check_bday.requests.post", side_effect=requests.ConnectionError):
+        assert notify("Tony", "555-1234", "key") is False
+
+
+def test_notify_returns_true_on_success():
+    with patch("check_bday.requests.post") as mock_post:
+        mock_post.return_value = MagicMock()
+        assert notify("Tony", "555-1234", "key") is True

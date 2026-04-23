@@ -28,25 +28,42 @@ def matches_today(bday: str, today: datetime.date) -> bool:
     return False
 
 
+REQUEST_TIMEOUT = 10
+
+
+def notify(name: str, phone: str, key: str) -> bool:
+    """Send a birthday text. Returns True on success, False on network failure.
+
+    Wrapped in try/except so a single network error doesn't halt the loop
+    and miss other birthdays that day. Timeout prevents the cron job from
+    hanging indefinitely if textbelt is unresponsive.
+    """
+    try:
+        resp = requests.post(
+            "https://textbelt.com/text",
+            {"phone": phone, "message": name + "'s birthday", "key": key},
+            timeout=REQUEST_TIMEOUT,
+        )
+        print(name + "'s birthday")
+        print(resp.json())
+        return True
+    except requests.RequestException as exc:
+        print(f"Failed to notify for {name}: {exc}")
+        return False
+
+
 def main():
     load_dotenv(os.path.expanduser("~/.env"))
 
     csv_path = Path(__file__).resolve().parent / "birthdays.csv"
     df = pd.read_csv(csv_path)
     today = datetime.date.today()
+    phone = os.getenv("PHONE")
+    key = os.getenv("TXTBELT_KEY")
 
     for _, item in df.iterrows():
         if matches_today(item["Birthday"], today):
-            resp = requests.post(
-                "https://textbelt.com/text",
-                {
-                    "phone": os.getenv("PHONE"),
-                    "message": item["Name"] + "'s birthday",
-                    "key": os.getenv("TXTBELT_KEY"),
-                },
-            )
-            print(item["Name"] + "'s birthday")
-            print(resp.json())
+            notify(item["Name"], phone, key)
 
 
 if __name__ == "__main__":
