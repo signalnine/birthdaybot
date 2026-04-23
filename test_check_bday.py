@@ -36,6 +36,50 @@ def test_feb_28_does_not_match_feb_29():
     assert not matches_today("02-28", date(2024, 2, 29))
 
 
+def test_single_digit_month_matches():
+    assert matches_today("2-14", date(2026, 2, 14))
+
+
+def test_single_digit_day_matches():
+    assert matches_today("02-4", date(2026, 2, 4))
+
+
+def test_single_digit_month_and_day_matches():
+    assert matches_today("2-4", date(2026, 2, 4))
+
+
+def test_leading_whitespace_matches():
+    assert matches_today(" 02-14", date(2026, 2, 14))
+
+
+def test_trailing_whitespace_matches():
+    assert matches_today("02-14 ", date(2026, 2, 14))
+
+
+def test_single_digit_feb_29_rolls_to_feb_28_in_non_leap_year():
+    assert matches_today("2-29", date(2025, 2, 28))
+
+
+def test_whitespace_feb_29_rolls_to_feb_28_in_non_leap_year():
+    assert matches_today(" 02-29 ", date(2025, 2, 28))
+
+
+def test_non_date_string_does_not_match():
+    assert not matches_today("not-a-date", date(2026, 2, 14))
+
+
+def test_empty_string_does_not_match():
+    assert not matches_today("", date(2026, 2, 14))
+
+
+def test_invalid_month_does_not_match():
+    assert not matches_today("13-01", date(2026, 1, 13))
+
+
+def test_invalid_day_does_not_match():
+    assert not matches_today("02-30", date(2026, 2, 1))
+
+
 def _ok_response():
     resp = MagicMock()
     resp.status_code = 200

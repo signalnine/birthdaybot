@@ -30,3 +30,13 @@
 - [x] Error message names the missing variable -> test: capture stderr, assert it mentions "PHONE" or "TXTBELT_KEY"
 - [x] `main()` does not call notify() when env vars are missing -> test: mock requests.post, assert not called
 - [x] `main()` runs normally when both env vars are set -> test: with PHONE and TXTBELT_KEY set, main() completes without SystemExit
+
+## Bug fix: non-zero-padded and whitespace birthdays silently skipped (birthdaybot-l6a)
+
+- [x] `matches_today` accepts single-digit month (e.g. "2-14") -> test: `matches_today("2-14", date(2026, 2, 14))` returns True
+- [x] `matches_today` accepts single-digit day (e.g. "02-4") -> test: `matches_today("02-4", date(2026, 2, 4))` returns True
+- [x] `matches_today` accepts both single-digit (e.g. "2-4") -> test: `matches_today("2-4", date(2026, 2, 4))` returns True
+- [x] `matches_today` tolerates leading whitespace -> test: `matches_today(" 02-14", date(2026, 2, 14))` returns True
+- [x] `matches_today` tolerates trailing whitespace -> test: `matches_today("02-14 ", date(2026, 2, 14))` returns True
+- [x] Feb-29 roll-to-Feb-28 still works with non-canonical formats -> test: `matches_today("2-29", date(2025, 2, 28))` returns True
+- [x] Unparseable strings return False (do not crash) -> tests: "not-a-date", "", "13-01", "02-30" all return False

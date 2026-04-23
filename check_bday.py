@@ -11,16 +11,42 @@ import requests
 from dotenv import load_dotenv
 
 
+def _parse_bday(bday: str) -> tuple[int, int] | None:
+    """Parse a CSV birthday string into (month, day), tolerating whitespace
+    and non-zero-padded values. Returns None if unparseable or invalid.
+    """
+    if not isinstance(bday, str):
+        return None
+    parts = bday.strip().split("-")
+    if len(parts) != 2:
+        return None
+    try:
+        month = int(parts[0])
+        day = int(parts[1])
+    except ValueError:
+        return None
+    try:
+        datetime.date(2000, month, day)
+    except ValueError:
+        return None
+    return month, day
+
+
 def matches_today(bday: str, today: datetime.date) -> bool:
     """Return True if the CSV birthday string matches today's date.
 
     Feb 29 birthdays roll to Feb 28 in non-leap years so they aren't
-    silently skipped for three years out of four.
+    silently skipped for three years out of four. Leading/trailing whitespace
+    and non-zero-padded month or day (e.g. "2-14") are accepted.
     """
-    if bday == today.strftime("%m-%d"):
+    parsed = _parse_bday(bday)
+    if parsed is None:
+        return False
+    month, day = parsed
+    if (month, day) == (today.month, today.day):
         return True
     if (
-        bday == "02-29"
+        (month, day) == (2, 29)
         and today.month == 2
         and today.day == 28
         and not calendar.isleap(today.year)
