@@ -3,6 +3,7 @@
 import calendar
 import datetime
 import os
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -74,11 +75,16 @@ def notify(name: str, phone: str, key: str) -> bool:
 def main():
     load_dotenv(os.path.expanduser("~/.env"))
 
+    phone = os.getenv("PHONE")
+    key = os.getenv("TXTBELT_KEY")
+    missing = [name for name, val in (("PHONE", phone), ("TXTBELT_KEY", key)) if not val]
+    if missing:
+        print(f"Missing required env var(s): {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
+
     csv_path = Path(__file__).resolve().parent / "birthdays.csv"
     df = pd.read_csv(csv_path)
     today = datetime.date.today()
-    phone = os.getenv("PHONE")
-    key = os.getenv("TXTBELT_KEY")
 
     for _, item in df.iterrows():
         if matches_today(item["Birthday"], today):

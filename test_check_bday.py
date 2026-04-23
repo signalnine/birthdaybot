@@ -1,9 +1,10 @@
 from datetime import date
 from unittest.mock import patch, MagicMock
 
+import pytest
 import requests
 
-from check_bday import matches_today, notify
+from check_bday import main, matches_today, notify
 
 
 def test_exact_match():
@@ -111,3 +112,38 @@ def test_notify_returns_false_when_body_is_scalar():
         resp.json.return_value = "surprise string"
         mock_post.return_value = resp
         assert notify("Tony", "555-1234", "key") is False
+
+
+def test_main_exits_nonzero_when_phone_missing(monkeypatch, capsys):
+    monkeypatch.delenv("PHONE", raising=False)
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    with patch("check_bday.requests.post") as mock_post:
+        with pytest.raises(SystemExit) as exc:
+            main()
+        assert exc.value.code != 0
+        mock_post.assert_not_called()
+    err = capsys.readouterr().err
+    assert "PHONE" in err
+
+
+def test_main_exits_nonzero_when_key_missing(monkeypatch, capsys):
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.delenv("TXTBELT_KEY", raising=False)
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    with patch("check_bday.requests.post") as mock_post:
+        with pytest.raises(SystemExit) as exc:
+            main()
+        assert exc.value.code != 0
+        mock_post.assert_not_called()
+    err = capsys.readouterr().err
+    assert "TXTBELT_KEY" in err
+
+
+def test_main_runs_when_env_vars_present(monkeypatch):
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    with patch("check_bday.requests.post") as mock_post:
+        mock_post.return_value = _ok_response()
+        main()
