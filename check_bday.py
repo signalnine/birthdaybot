@@ -113,8 +113,20 @@ def main():
     today = datetime.date.today()
 
     for _, item in df.iterrows():
-        if matches_today(item["Birthday"], today):
-            notify(item["Name"], phone, key)
+        if not matches_today(item["Birthday"], today):
+            continue
+        name = item["Name"]
+        if not isinstance(name, str) or not name.strip():
+            print(
+                f"Skipping row with missing or non-string Name (Birthday={item['Birthday']!r})",
+                file=sys.stderr,
+            )
+            continue
+        try:
+            notify(name.strip(), phone, key)
+        except Exception as exc:
+            # One surprise from notify() must not skip remaining birthdays for today.
+            print(f"Unexpected error notifying {name!r}: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -40,3 +40,9 @@
 - [x] `matches_today` tolerates trailing whitespace -> test: `matches_today("02-14 ", date(2026, 2, 14))` returns True
 - [x] Feb-29 roll-to-Feb-28 still works with non-canonical formats -> test: `matches_today("2-29", date(2025, 2, 28))` returns True
 - [x] Unparseable strings return False (do not crash) -> tests: "not-a-date", "", "13-01", "02-30" all return False
+
+## Bug fix: malformed CSV row aborts whole run (birthdaybot-23x)
+
+- [x] Row with NaN Name is skipped, later matching rows still notified -> test: `test_main_skips_row_with_nan_name_and_continues`
+- [x] Row with empty/whitespace Name is skipped, later matching rows still notified -> test: `test_main_skips_row_with_empty_name_and_continues`
+- [x] Unexpected exception from `notify()` does not abort remaining rows -> test: `test_main_survives_unexpected_notify_exception`

@@ -191,3 +191,84 @@ def test_main_runs_when_env_vars_present(monkeypatch):
     with patch("check_bday.requests.post") as mock_post:
         mock_post.return_value = _ok_response()
         main()
+
+
+def _run_main_with_csv(monkeypatch, csv_rows, today):
+    import pandas as pd
+
+    df = pd.DataFrame(csv_rows)
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return today
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    with patch("check_bday.requests.post") as mock_post:
+        mock_post.return_value = _ok_response()
+        main()
+        return mock_post
+
+
+def test_main_skips_row_with_nan_name_and_continues(monkeypatch, capsys):
+    import numpy as np
+
+    rows = [
+        {"Birthday": "04-24", "Name": np.nan},
+        {"Birthday": "04-24", "Name": "RealUser"},
+    ]
+    mock_post = _run_main_with_csv(monkeypatch, rows, date(2026, 4, 24))
+    assert mock_post.call_count == 1
+    sent_data = mock_post.call_args.args[1]
+    assert sent_data["message"] == "RealUser's birthday"
+    err = capsys.readouterr().out + capsys.readouterr().err
+    # The run must not crash -- reaching this assertion means TypeError did not propagate.
+
+
+def test_main_skips_row_with_empty_name_and_continues(monkeypatch):
+    rows = [
+        {"Birthday": "04-24", "Name": ""},
+        {"Birthday": "04-24", "Name": "   "},
+        {"Birthday": "04-24", "Name": "RealUser"},
+    ]
+    mock_post = _run_main_with_csv(monkeypatch, rows, date(2026, 4, 24))
+    assert mock_post.call_count == 1
+    sent_data = mock_post.call_args.args[1]
+    assert sent_data["message"] == "RealUser's birthday"
+
+
+def test_main_survives_unexpected_notify_exception(monkeypatch):
+    rows = [
+        {"Birthday": "04-24", "Name": "FirstUser"},
+        {"Birthday": "04-24", "Name": "SecondUser"},
+    ]
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 4, 24)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+
+    call_log = []
+
+    def flaky_notify(name, phone, key):
+        call_log.append(name)
+        if name == "FirstUser":
+            raise RuntimeError("boom")
+        return True
+
+    monkeypatch.setattr("check_bday.notify", flaky_notify)
+    main()
+    assert call_log == ["FirstUser", "SecondUser"]
