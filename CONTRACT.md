@@ -46,3 +46,10 @@
 - [x] Row with NaN Name is skipped, later matching rows still notified -> test: `test_main_skips_row_with_nan_name_and_continues`
 - [x] Row with empty/whitespace Name is skipped, later matching rows still notified -> test: `test_main_skips_row_with_empty_name_and_continues`
 - [x] Unexpected exception from `notify()` does not abort remaining rows -> test: `test_main_survives_unexpected_notify_exception`
+
+## Bug fix: whitespace-only env vars silently accepted (birthdaybot-ndt)
+
+- [x] `main()` exits non-zero when PHONE is whitespace-only -> test: `test_main_exits_nonzero_when_phone_is_whitespace_only`
+- [x] `main()` exits non-zero when TXTBELT_KEY is whitespace-only -> test: `test_main_exits_nonzero_when_key_is_whitespace_only`
+- [x] Leading/trailing whitespace stripped from PHONE before sending -> test: `test_main_strips_whitespace_from_phone_before_sending`
+- [x] Leading/trailing whitespace stripped from TXTBELT_KEY before sending -> test: `test_main_strips_whitespace_from_key_before_sending`

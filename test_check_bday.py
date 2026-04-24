@@ -193,6 +193,80 @@ def test_main_runs_when_env_vars_present(monkeypatch):
         main()
 
 
+def test_main_exits_nonzero_when_phone_is_whitespace_only(monkeypatch, capsys):
+    monkeypatch.setenv("PHONE", "   ")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    with patch("check_bday.requests.post") as mock_post:
+        with pytest.raises(SystemExit) as exc:
+            main()
+        assert exc.value.code != 0
+        mock_post.assert_not_called()
+    err = capsys.readouterr().err
+    assert "PHONE" in err
+
+
+def test_main_exits_nonzero_when_key_is_whitespace_only(monkeypatch, capsys):
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "\t\n ")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    with patch("check_bday.requests.post") as mock_post:
+        with pytest.raises(SystemExit) as exc:
+            main()
+        assert exc.value.code != 0
+        mock_post.assert_not_called()
+    err = capsys.readouterr().err
+    assert "TXTBELT_KEY" in err
+
+
+def test_main_strips_whitespace_from_phone_before_sending(monkeypatch):
+    rows = [{"Birthday": "04-24", "Name": "Tony"}]
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    monkeypatch.setenv("PHONE", "  555-1234\n")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 4, 24)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    with patch("check_bday.requests.post") as mock_post:
+        mock_post.return_value = _ok_response()
+        main()
+        assert mock_post.call_count == 1
+        sent_data = mock_post.call_args.args[1]
+        assert sent_data["phone"] == "555-1234"
+
+
+def test_main_strips_whitespace_from_key_before_sending(monkeypatch):
+    rows = [{"Birthday": "04-24", "Name": "Tony"}]
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "  testkey\t")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 4, 24)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    with patch("check_bday.requests.post") as mock_post:
+        mock_post.return_value = _ok_response()
+        main()
+        assert mock_post.call_count == 1
+        sent_data = mock_post.call_args.args[1]
+        assert sent_data["key"] == "testkey"
+
+
 def _run_main_with_csv(monkeypatch, csv_rows, today):
     import pandas as pd
 

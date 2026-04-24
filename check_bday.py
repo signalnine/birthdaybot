@@ -101,8 +101,8 @@ def notify(name: str, phone: str, key: str) -> bool:
 def main():
     load_dotenv(os.path.expanduser("~/.env"))
 
-    phone = os.getenv("PHONE")
-    key = os.getenv("TXTBELT_KEY")
+    phone = (os.getenv("PHONE") or "").strip()
+    key = (os.getenv("TXTBELT_KEY") or "").strip()
     missing = [name for name, val in (("PHONE", phone), ("TXTBELT_KEY", key)) if not val]
     if missing:
         print(f"Missing required env var(s): {', '.join(missing)}", file=sys.stderr)
