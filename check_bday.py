@@ -64,7 +64,9 @@ def notify(name: str, phone: str, key: str) -> bool:
     textbelt returns 200 with `{"success": false, "error": "..."}` for
     application-level failures (out of quota, bad key, invalid phone), so
     a 2xx status alone is not enough -- the response body must also report
-    success.
+    success. Stdout gets a single confirmation line only after success is
+    observed; every failure path writes to stderr so cron mail surfaces it
+    and pipes can separate success from failure.
     """
     try:
         resp = requests.post(
@@ -73,28 +75,30 @@ def notify(name: str, phone: str, key: str) -> bool:
             timeout=REQUEST_TIMEOUT,
         )
     except requests.RequestException as exc:
-        print(f"Failed to notify for {name}: {exc}")
+        print(f"Failed to notify for {name}: {exc}", file=sys.stderr)
         return False
 
-    print(name + "'s birthday")
-
     if resp.status_code >= 400:
-        print(f"textbelt returned HTTP {resp.status_code} for {name}")
+        print(f"textbelt returned HTTP {resp.status_code} for {name}", file=sys.stderr)
         return False
 
     try:
         body = resp.json()
     except ValueError:
-        print(f"textbelt returned non-JSON response for {name}")
+        print(f"textbelt returned non-JSON response for {name}", file=sys.stderr)
         return False
 
-    print(body)
     if not isinstance(body, dict):
-        print(f"textbelt returned unexpected JSON shape for {name}: {type(body).__name__}")
+        print(
+            f"textbelt returned unexpected JSON shape for {name}: {type(body).__name__}",
+            file=sys.stderr,
+        )
         return False
     if not body.get("success"):
-        print(f"textbelt rejected message for {name}: {body.get('error')}")
+        print(f"textbelt rejected message for {name}: {body.get('error')}", file=sys.stderr)
         return False
+
+    print(f"sent birthday text to {name}")
     return True
 
 
@@ -109,7 +113,20 @@ def main():
         sys.exit(1)
 
     csv_path = Path(__file__).resolve().parent / "birthdays.csv"
-    df = pd.read_csv(csv_path)
+    try:
+        df = pd.read_csv(csv_path)
+    except FileNotFoundError:
+        print(f"birthdays.csv not found at {csv_path}", file=sys.stderr)
+        sys.exit(1)
+
+    missing_cols = [c for c in ("Birthday", "Name") if c not in df.columns]
+    if missing_cols:
+        print(
+            f"birthdays.csv is missing required column(s): {', '.join(missing_cols)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     today = datetime.date.today()
 
     for _, item in df.iterrows():

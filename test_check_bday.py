@@ -315,6 +315,132 @@ def test_main_skips_row_with_empty_name_and_continues(monkeypatch):
     assert sent_data["message"] == "RealUser's birthday"
 
 
+def _confirmation_phrase(name: str) -> str:
+    return name + "'s birthday"
+
+
+def test_notify_does_not_log_success_on_http_error(capsys):
+    with patch("check_bday.requests.post") as mock_post:
+        resp = MagicMock()
+        resp.status_code = 500
+        resp.json.return_value = {}
+        mock_post.return_value = resp
+        notify("Tony", "555-1234", "key")
+    out = capsys.readouterr().out
+    assert _confirmation_phrase("Tony") not in out
+
+
+def test_notify_does_not_log_success_on_api_failure(capsys):
+    with patch("check_bday.requests.post") as mock_post:
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {"success": False, "error": "Out of quota"}
+        mock_post.return_value = resp
+        notify("Tony", "555-1234", "key")
+    out = capsys.readouterr().out
+    assert _confirmation_phrase("Tony") not in out
+
+
+def test_notify_does_not_log_success_on_non_dict_body(capsys):
+    for body in (None, ["unexpected"], "surprise string"):
+        with patch("check_bday.requests.post") as mock_post:
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json.return_value = body
+            mock_post.return_value = resp
+            notify("Tony", "555-1234", "key")
+        out = capsys.readouterr().out
+        assert _confirmation_phrase("Tony") not in out, f"leaked confirmation for body={body!r}"
+
+
+def test_notify_logs_success_only_after_confirmation(capsys):
+    with patch("check_bday.requests.post") as mock_post:
+        mock_post.return_value = _ok_response()
+        assert notify("Tony", "555-1234", "key") is True
+    out = capsys.readouterr().out
+    assert "Tony" in out
+
+
+def test_notify_failure_messages_go_to_stderr(capsys):
+    failure_cases = [
+        ("http_error", lambda r: (setattr(r, "status_code", 500), r.json.configure_mock(return_value={}))),
+        ("api_failure", lambda r: (setattr(r, "status_code", 200), r.json.configure_mock(return_value={"success": False, "error": "Out of quota"}))),
+        ("non_dict", lambda r: (setattr(r, "status_code", 200), r.json.configure_mock(return_value=None))),
+    ]
+    for label, configure in failure_cases:
+        resp = MagicMock()
+        configure(resp)
+        with patch("check_bday.requests.post") as mock_post:
+            mock_post.return_value = resp
+            notify("Tony", "555-1234", "key")
+        captured = capsys.readouterr()
+        # Stdout must contain no error/failure content for these paths.
+        assert "Tony" not in captured.out, f"{label}: leaked Tony to stdout: {captured.out!r}"
+        # Stderr must contain a failure indication.
+        assert captured.err.strip(), f"{label}: expected stderr message, got empty"
+
+
+def test_notify_request_exception_message_goes_to_stderr(capsys):
+    with patch("check_bday.requests.post", side_effect=requests.Timeout("slow")):
+        notify("Tony", "555-1234", "key")
+    captured = capsys.readouterr()
+    assert _confirmation_phrase("Tony") not in captured.out
+    assert "Tony" in captured.err
+
+
+def test_main_exits_nonzero_when_csv_missing(monkeypatch, capsys, tmp_path):
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+
+    def _raise_missing(*a, **kw):
+        raise FileNotFoundError("birthdays.csv")
+
+    monkeypatch.setattr("check_bday.pd.read_csv", _raise_missing)
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+    err = capsys.readouterr().err
+    # Single-line, mentions the file, no traceback header.
+    assert "birthdays.csv" in err
+    assert "Traceback" not in err
+    assert err.count("\n") <= 1
+
+
+def test_main_exits_nonzero_when_csv_missing_birthday_column(monkeypatch, capsys):
+    import pandas as pd
+
+    df = pd.DataFrame([{"Name": "Tony"}])
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+    err = capsys.readouterr().err
+    assert "Birthday" in err
+    assert "Traceback" not in err
+    assert err.count("\n") <= 1
+
+
+def test_main_exits_nonzero_when_csv_missing_name_column(monkeypatch, capsys):
+    import pandas as pd
+
+    df = pd.DataFrame([{"Birthday": "04-24"}])
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+    err = capsys.readouterr().err
+    assert "Name" in err
+    assert "Traceback" not in err
+    assert err.count("\n") <= 1
+
+
 def test_main_survives_unexpected_notify_exception(monkeypatch):
     rows = [
         {"Birthday": "04-24", "Name": "FirstUser"},

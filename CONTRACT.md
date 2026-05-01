@@ -53,3 +53,24 @@
 - [x] `main()` exits non-zero when TXTBELT_KEY is whitespace-only -> test: `test_main_exits_nonzero_when_key_is_whitespace_only`
 - [x] Leading/trailing whitespace stripped from PHONE before sending -> test: `test_main_strips_whitespace_from_phone_before_sending`
 - [x] Leading/trailing whitespace stripped from TXTBELT_KEY before sending -> test: `test_main_strips_whitespace_from_key_before_sending`
+
+## Bug fix: notify() logs delivery before confirming success (birthdaybot-5ip)
+
+- [x] `notify()` does NOT write a delivery-confirmation line to stdout when HTTP status >= 400 -> test: `test_notify_does_not_log_success_on_http_error`
+- [x] `notify()` does NOT write a delivery-confirmation line to stdout when body reports `success: false` -> test: `test_notify_does_not_log_success_on_api_failure`
+- [x] `notify()` does NOT write a delivery-confirmation line to stdout when body is a non-dict (null/list/scalar) -> test: `test_notify_does_not_log_success_on_non_dict_body`
+- [x] `notify()` writes a confirmation line to stdout only after `success: true` is observed -> test: `test_notify_logs_success_only_after_confirmation`
+- [x] All failure-path messages from `notify()` go to stderr, not stdout -> test: `test_notify_failure_messages_go_to_stderr`
+
+## Bug fix: missing or malformed CSV crashes with raw traceback (birthdaybot-v0z)
+
+- [x] `main()` exits non-zero with a single-line stderr error when birthdays.csv is missing -> test: `test_main_exits_nonzero_when_csv_missing`
+- [x] `main()` exits non-zero with a single-line stderr error when CSV is missing the 'Birthday' column -> test: `test_main_exits_nonzero_when_csv_missing_birthday_column`
+- [x] `main()` exits non-zero with a single-line stderr error when CSV is missing the 'Name' column -> test: `test_main_exits_nonzero_when_csv_missing_name_column`
+- [x] No raw pandas traceback escapes any of the above paths -> verified by the same tests asserting a clean single-line message
+
+## Doc fix: README contradicts implementation (birthdaybot-oz5)
+
+- [x] README describes SMS delivery via textbelt (not Twitter/Instagram) -> verified by reading README
+- [x] README names the required env vars `PHONE` and `TXTBELT_KEY` -> verified by reading README
+- [x] README either drops the unused Twitter/Instagram CSV columns or documents that they are ignored -> verified by reading README
