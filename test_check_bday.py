@@ -472,3 +472,220 @@ def test_main_survives_unexpected_notify_exception(monkeypatch):
     monkeypatch.setattr("check_bday.notify", flaky_notify)
     main()
     assert call_log == ["FirstUser", "SecondUser"]
+
+
+def _setup_main_env(monkeypatch):
+    monkeypatch.setenv("PHONE", "555-1234")
+    monkeypatch.setenv("TXTBELT_KEY", "testkey")
+    monkeypatch.setattr("check_bday.load_dotenv", lambda *a, **kw: None)
+
+
+def test_main_exits_nonzero_on_csv_parser_error(monkeypatch, capsys):
+    import pandas as pd
+
+    _setup_main_env(monkeypatch)
+
+    def _raise_parser(*a, **kw):
+        raise pd.errors.ParserError("Error tokenizing data")
+
+    monkeypatch.setattr("check_bday.pd.read_csv", _raise_parser)
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+    err = capsys.readouterr().err
+    assert "birthdays.csv" in err
+    assert "Traceback" not in err
+    assert err.count("\n") <= 1
+
+
+def test_main_exits_nonzero_on_csv_empty_data_error(monkeypatch, capsys):
+    import pandas as pd
+
+    _setup_main_env(monkeypatch)
+
+    def _raise_empty(*a, **kw):
+        raise pd.errors.EmptyDataError("No columns to parse from file")
+
+    monkeypatch.setattr("check_bday.pd.read_csv", _raise_empty)
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+    err = capsys.readouterr().err
+    assert "birthdays.csv" in err
+    assert "Traceback" not in err
+    assert err.count("\n") <= 1
+
+
+def test_main_exits_nonzero_on_csv_unicode_decode_error(monkeypatch, capsys):
+    _setup_main_env(monkeypatch)
+
+    def _raise_unicode(*a, **kw):
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr("check_bday.pd.read_csv", _raise_unicode)
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+    err = capsys.readouterr().err
+    assert "birthdays.csv" in err
+    assert "Traceback" not in err
+    assert err.count("\n") <= 1
+
+
+def test_main_exits_nonzero_when_all_notify_attempts_fail(monkeypatch, capsys):
+    rows = [
+        {"Birthday": "04-24", "Name": "FirstUser"},
+        {"Birthday": "04-24", "Name": "SecondUser"},
+    ]
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    _setup_main_env(monkeypatch)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 4, 24)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    monkeypatch.setattr("check_bday.notify", lambda *a, **kw: False)
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+
+
+def test_main_exits_nonzero_when_all_notify_attempts_raise(monkeypatch):
+    rows = [{"Birthday": "04-24", "Name": "OnlyUser"}]
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    _setup_main_env(monkeypatch)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 4, 24)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+
+    def _raise(*a, **kw):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("check_bday.notify", _raise)
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+
+
+def test_main_exits_zero_when_at_least_one_notify_succeeds(monkeypatch):
+    rows = [
+        {"Birthday": "04-24", "Name": "FailUser"},
+        {"Birthday": "04-24", "Name": "WinUser"},
+    ]
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    _setup_main_env(monkeypatch)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 4, 24)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    monkeypatch.setattr(
+        "check_bday.notify",
+        lambda name, *a, **kw: name == "WinUser",
+    )
+    main()
+
+
+def test_main_exits_zero_when_no_birthdays_today(monkeypatch):
+    rows = [{"Birthday": "01-01", "Name": "Other"}]
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    _setup_main_env(monkeypatch)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 4, 24)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    called = []
+    monkeypatch.setattr("check_bday.notify", lambda *a, **kw: called.append(a) or True)
+    main()
+    assert called == []
+
+
+def test_main_warns_when_birthday_is_nan_but_name_present(monkeypatch, capsys):
+    import numpy as np
+    import pandas as pd
+
+    rows = [{"Birthday": np.nan, "Name": "Forgot My Birthday"}]
+    df = pd.DataFrame(rows)
+    _setup_main_env(monkeypatch)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 7, 4)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    monkeypatch.setattr("check_bday.notify", lambda *a, **kw: True)
+    main()
+    err = capsys.readouterr().err
+    assert "Forgot My Birthday" in err
+
+
+def test_main_warns_when_birthday_is_int_but_name_present(monkeypatch, capsys):
+    import pandas as pd
+
+    rows = [{"Birthday": 704, "Name": "Tony"}]
+    df = pd.DataFrame(rows)
+    _setup_main_env(monkeypatch)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 7, 4)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    monkeypatch.setattr("check_bday.notify", lambda *a, **kw: True)
+    main()
+    err = capsys.readouterr().err
+    assert "Tony" in err
+
+
+def test_main_silent_on_fully_empty_row(monkeypatch, capsys):
+    import numpy as np
+    import pandas as pd
+
+    rows = [
+        {"Birthday": np.nan, "Name": np.nan},
+        {"Birthday": "07-04", "Name": "Tony"},
+    ]
+    df = pd.DataFrame(rows)
+    _setup_main_env(monkeypatch)
+    monkeypatch.setattr("check_bday.pd.read_csv", lambda *a, **kw: df)
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 7, 4)
+
+    monkeypatch.setattr("check_bday.datetime.date", _FakeDate)
+    monkeypatch.setattr("check_bday.notify", lambda *a, **kw: True)
+    main()
+    err = capsys.readouterr().err
+    # Only Tony should run; the fully-empty row must produce no stderr line.
+    assert "Skipping" not in err
+    assert "Birthday" not in err

@@ -69,6 +69,25 @@
 - [x] `main()` exits non-zero with a single-line stderr error when CSV is missing the 'Name' column -> test: `test_main_exits_nonzero_when_csv_missing_name_column`
 - [x] No raw pandas traceback escapes any of the above paths -> verified by the same tests asserting a clean single-line message
 
+## Bug fix: malformed CSV crashes with raw pandas traceback (birthdaybot-d74)
+
+- [x] `main()` exits non-zero with single-line stderr on `pd.errors.ParserError` -> test: `test_main_exits_nonzero_on_csv_parser_error`
+- [x] `main()` exits non-zero with single-line stderr on `pd.errors.EmptyDataError` -> test: `test_main_exits_nonzero_on_csv_empty_data_error`
+- [x] `main()` exits non-zero with single-line stderr on `UnicodeDecodeError` -> test: `test_main_exits_nonzero_on_csv_unicode_decode_error`
+
+## Bug fix: main() exits 0 when every notification fails (birthdaybot-266)
+
+- [x] `main()` exits non-zero when every notify() attempt returns False -> test: `test_main_exits_nonzero_when_all_notify_attempts_fail`
+- [x] `main()` exits non-zero when every notify() attempt raises -> test: `test_main_exits_nonzero_when_all_notify_attempts_raise`
+- [x] `main()` exits zero when at least one notify() attempt succeeds -> test: `test_main_exits_zero_when_at_least_one_notify_succeeds`
+- [x] `main()` exits zero when no rows match today (no attempts) -> test: `test_main_exits_zero_when_no_birthdays_today`
+
+## Bug fix: rows with non-string Birthday silently skipped (birthdaybot-83f)
+
+- [x] Row with NaN Birthday but present Name produces a stderr warning -> test: `test_main_warns_when_birthday_is_nan_but_name_present`
+- [x] Row with int Birthday (pandas type-inferred from "0704") but present Name produces a stderr warning -> test: `test_main_warns_when_birthday_is_int_but_name_present`
+- [x] Fully empty row (both fields missing) stays silent to avoid noise on trailing CSV blank lines -> test: `test_main_silent_on_fully_empty_row`
+
 ## Doc fix: README contradicts implementation (birthdaybot-oz5)
 
 - [x] README describes SMS delivery via textbelt (not Twitter/Instagram) -> verified by reading README

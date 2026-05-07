@@ -118,6 +118,9 @@ def main():
     except FileNotFoundError:
         print(f"birthdays.csv not found at {csv_path}", file=sys.stderr)
         sys.exit(1)
+    except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as exc:
+        print(f"Failed to read birthdays.csv: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     missing_cols = [c for c in ("Birthday", "Name") if c not in df.columns]
     if missing_cols:
@@ -129,21 +132,43 @@ def main():
 
     today = datetime.date.today()
 
+    attempts = 0
+    successes = 0
     for _, item in df.iterrows():
-        if not matches_today(item["Birthday"], today):
-            continue
+        bday = item["Birthday"]
         name = item["Name"]
-        if not isinstance(name, str) or not name.strip():
+        name_present = isinstance(name, str) and name.strip()
+        if not matches_today(bday, today):
+            # A row with a present Name but unparseable Birthday will never match,
+            # so it gets silently dropped without this warning -- mirror the
+            # missing-Name warning style so operators notice the typo. Rows where
+            # Name is also missing stay silent (trailing blank CSV lines).
+            if name_present and _parse_bday(bday) is None:
+                print(
+                    f"Skipping row with unparseable Birthday (Name={name.strip()!r}, Birthday={bday!r})",
+                    file=sys.stderr,
+                )
+            continue
+        if not name_present:
             print(
-                f"Skipping row with missing or non-string Name (Birthday={item['Birthday']!r})",
+                f"Skipping row with missing or non-string Name (Birthday={bday!r})",
                 file=sys.stderr,
             )
             continue
+        attempts += 1
         try:
-            notify(name.strip(), phone, key)
+            if notify(name.strip(), phone, key):
+                successes += 1
         except Exception as exc:
             # One surprise from notify() must not skip remaining birthdays for today.
             print(f"Unexpected error notifying {name!r}: {exc}", file=sys.stderr)
+
+    if attempts > 0 and successes == 0:
+        print(
+            f"All {attempts} birthday notification attempt(s) failed",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
