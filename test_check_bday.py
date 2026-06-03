@@ -288,6 +288,22 @@ def _run_main_with_csv(monkeypatch, csv_rows, today):
         return mock_post
 
 
+def test_main_notifies_every_person_sharing_a_birthday(monkeypatch):
+    # The core job: notify EVERY match for today, not just the first. 07-04 is a
+    # real multi-person day in the bundled birthdays.csv (Tony and Maureen Long).
+    # This guards against a regression that stops the loop after the first match
+    # (early return / break / success short-circuit) -- the exact failure that
+    # would silently drop birthdays while the "at least one success" tests pass.
+    rows = [
+        {"Birthday": "07-04", "Name": "Tony"},
+        {"Birthday": "07-04", "Name": "Maureen Long"},
+    ]
+    mock_post = _run_main_with_csv(monkeypatch, rows, date(2026, 7, 4))
+    assert mock_post.call_count == 2
+    messages = [call.args[1]["message"] for call in mock_post.call_args_list]
+    assert messages == ["Tony's birthday", "Maureen Long's birthday"]
+
+
 def test_main_skips_row_with_nan_name_and_continues(monkeypatch, capsys):
     import numpy as np
 
